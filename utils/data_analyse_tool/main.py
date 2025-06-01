@@ -123,7 +123,7 @@ def traverse_folder_for_Q13(path):
 def traverse_folder_for_similarity(path):
     if os.path.isdir(path):
         for f in os.listdir(path):
-            traverse_folder_for_Q13(os.path.join(path, f))
+            traverse_folder_for_similarity(os.path.join(path, f))
     else:
         if path.endswith('.java'):
             file_content = ""
