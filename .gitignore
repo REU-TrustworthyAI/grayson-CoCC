@@ -1,0 +1,5 @@
+.vscode
+**/.DS_Store
+features
+baseline/OCD/data
+baseline/OCD/model.*

@@ -1,16 +1,15 @@
-import random
+#import random
 from sklearn.naive_bayes import GaussianNB
-from sklearn.neighbors import KNeighborsClassifier
+#from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 
 import numpy as np
-import scipy
+#import scipy
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
-import random
 from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.metrics import roc_curve, auc, roc_auc_score, precision_score, recall_score, f1_score, accuracy_score
 from sklearn.metrics import classification_report
@@ -23,8 +22,8 @@ import matplotlib.pyplot as plt
 
 block = pd.read_csv("../csv/block.csv")
 method = pd.read_csv("../csv/method.csv")
-top = pd.read_csv('block_method_top.csv')
-block_method = pd.concat([block, method], axis=0)
+#top = pd.read_csv('block_method_top.csv')
+#block_method = pd.concat([block, method], axis=0)
 # ------------------------ new version ------------------------
 block_new = block.drop(
     ['lineNumOfOldCommentBylineNumOf"OldCCSet', 'lineNumOfOldCode', 'lineNumOfOldComment', 'lineNumOfChanged',
@@ -175,7 +174,7 @@ def different_model():
 
     
 
-    print('-------------------- GaussianNB网格搜索 --------------------')
+    print('-------------------- GaussianNB --------------------')
     param_grid = {'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6, 1e-5]}
     gnb = GaussianNB()
     cv = 10
@@ -188,7 +187,8 @@ def different_model():
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
 
-    print('-------------------- LogisticRegression网格搜索 --------------------')
+    '''
+    print('-------------------- LogisticRegression --------------------')
     param_grid = {
         'penalty': ['l1', 'l2'],
         'C': [0.001, 0.01, 0.1, 1, 10, 100],
@@ -204,8 +204,9 @@ def different_model():
     print("Best parameters:", best_params)
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
+    '''
 
-    print('-------------------- Decision Tree网格搜索 --------------------')
+    print('-------------------- Decision Tree --------------------')
     param_grid = {
         'criterion': ['gini', 'entropy'],
         'max_depth': [None, 5, 10, 20],
@@ -224,7 +225,7 @@ def different_model():
     print("Best model:", best_model)
 
 
-    print('-------------------- XGBoost 网格搜索 --------------------')
+    print('-------------------- XGBoost --------------------')
     param_grid = {
         'learning_rate': [0.01, 0.1, 1],
         'max_depth': [3, 5, 7],
@@ -243,8 +244,8 @@ def different_model():
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
 
-    print('-------------------- Random Forest 网格搜索 --------------------')
-     param_grid = {
+    print('-------------------- Random Forest --------------------')
+    param_grid = {
         'n_estimators': [50, 100, 200, 300],
         'criterion': ['gini', 'entropy'],
         'max_depth': [None, 5, 10, 20],
@@ -263,7 +264,7 @@ def different_model():
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
     
-    print('-------------------- SVM网格搜索 --------------------')
+    print('-------------------- SVM --------------------')
     param_grid = {'C': [0.1, 1, 10, 100],
                   'gamma': [0.1, 1, 10, 100],
                   'kernel': ['linear', 'rbf']}
@@ -300,7 +301,6 @@ def random_forest_pred():
     cm2 = confusion_matrix(ytest, predicted)
     print(cm2)
     print('acc:', accuracy_score(ytest, predicted))
-    print("过时注释:")
     print('Recall:', recall_score(ytest, predicted))
     print('F1-score:', f1_score(ytest, predicted))
     print('Precision score:', precision_score(ytest, predicted))
