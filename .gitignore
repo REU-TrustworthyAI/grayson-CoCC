@@ -1,5 +1,7 @@
 .vscode
 **/.DS_Store
 features
+python_ccset_raw
+panthaplackel
 baseline/OCD/data
 baseline/OCD/model.*

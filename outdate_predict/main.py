@@ -173,7 +173,7 @@ def different_model():
     print('XGBoost:\t', precision_score(ytest, xgb_pre), f1_score(ytest, xgb_pre), recall_score(ytest, xgb_pre))
 
     
-
+    '''
     print('-------------------- GaussianNB --------------------')
     param_grid = {'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6, 1e-5]}
     gnb = GaussianNB()
@@ -187,7 +187,7 @@ def different_model():
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
 
-    '''
+    
     print('-------------------- LogisticRegression --------------------')
     param_grid = {
         'penalty': ['l1', 'l2'],
@@ -204,8 +204,8 @@ def different_model():
     print("Best parameters:", best_params)
     print("Best score:", grid_search.best_score_)
     print("Best model:", best_model)
-    '''
 
+    
     print('-------------------- Decision Tree --------------------')
     param_grid = {
         'criterion': ['gini', 'entropy'],
@@ -304,7 +304,7 @@ def random_forest_pred():
     print('Recall:', recall_score(ytest, predicted))
     print('F1-score:', f1_score(ytest, predicted))
     print('Precision score:', precision_score(ytest, predicted))
-
+'''
 
 different_model()
 # random_forest_pred()

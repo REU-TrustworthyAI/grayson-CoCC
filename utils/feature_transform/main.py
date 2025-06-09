@@ -4,6 +4,7 @@ from multiprocessing import Pool, cpu_count
 from sentence_transformers import SentenceTransformer
 
 # --- Regex Compilations (for efficiency) ---
+# Java-specific regexes (kept for context)
 OLD_COMMENT_REGEX = re.compile(r"oldComment:\n(.*?)\noldCode:", re.DOTALL)
 OLD_CODE_REGEX = re.compile(r"oldCode:\n(.*?)\n\nnewComment:", re.DOTALL)
 NEW_COMMENT_REGEX = re.compile(r"newComment:\n(.*?)\nnewCode:", re.DOTALL)
@@ -13,29 +14,47 @@ LABEL_REGEX = re.compile(r"label:(\d+)")
 # Regex for camel case splitting
 CAMEL_CASE_SPLIT_REGEX = re.compile(r'(?<!^)(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])')
 
-def split_camel_case(text):
+# Regex to remove non-alphanumeric characters (except spaces after splitting)
+NON_ALPHANUMERIC_REGEX = re.compile(r'[^a-zA-Z0-9\s]')
+
+# --- NEW Regex Patterns for Python Delimiters ---
+# Matches a line consisting of one or more hyphens
+PYTHON_OLD_NEW_DELIMITER_REGEX = re.compile(r'^\s*-+$', re.MULTILINE)
+# Matches a line consisting of one or more equals signs
+PYTHON_END_DELIMITER_REGEX = re.compile(r'^\s*=+$', re.MULTILINE)
+
+def split_camel_case_and_clean(text):
     """
-    Splits a camelCase or PascalCase string into separate words.
-    Example: "helloWorld" -> "hello World"
-             "HTTPRequest" -> "HTTP Request"
+    Splits camelCase/PascalCase, removes non-alphanumeric characters,
+    standardizes spaces, and lowercases the text.
     """
     if text is None:
         return None
-    return ' '.join(CAMEL_CASE_SPLIT_REGEX.sub(' ', text).split())
+
+    text = CAMEL_CASE_SPLIT_REGEX.sub(' ', text)
+    #text = NON_ALPHANUMERIC_REGEX.sub(' ', text)
+    #text = text.lower()
+    text = ' '.join(text.split()).strip()
+
+    return text
+
+def extract_python_comments(code_block_text):
+    """
+    Extracts and cleans single-line comments (#) from a Python code block.
+    """
+    comments = []
+    lines = code_block_text.splitlines()
+    for line in lines:
+        stripped_line = line.strip()
+        if stripped_line.startswith('#'):
+            comment_text = split_camel_case_and_clean(stripped_line[1:].strip())
+            if comment_text:
+                comments.append(comment_text)
+    return comments
 
 def parse_code_change_file(file_content):
     """
-    Parses the content of a code change file to extract old/new comments,
-    old/new code, and the label. It also breaks up words based on camel case
-    in the extracted code and comment sections.
-
-    Args:
-        file_content (str): The full content of the file as a string.
-
-    Returns:
-        dict: A dictionary containing 'oldComment', 'oldCode', 'newComment',
-              'newCode', and 'label'. Returns None for missing sections.
-              The code and comment strings will have camel case words split.
+    Parses the content of a code change file (Java format).
     """
     data = {
         "oldComment": None,
@@ -46,21 +65,70 @@ def parse_code_change_file(file_content):
     }
 
     if old_comment_match := OLD_COMMENT_REGEX.search(file_content):
-        data["oldComment"] = split_camel_case(old_comment_match.group(1).strip())
+        data["oldComment"] = split_camel_case_and_clean(old_comment_match.group(1).strip())
 
     if old_code_match := OLD_CODE_REGEX.search(file_content):
-        data["oldCode"] = split_camel_case(old_code_match.group(1).strip())
+        data["oldCode"] = split_camel_case_and_clean(old_code_match.group(1).strip())
 
     if new_comment_match := NEW_COMMENT_REGEX.search(file_content):
-        data["newComment"] = split_camel_case(new_comment_match.group(1).strip())
+        data["newComment"] = split_camel_case_and_clean(new_comment_match.group(1).strip())
 
     if new_code_match := NEW_CODE_REGEX.search(file_content):
-        data["newCode"] = split_camel_case(new_code_match.group(1).strip())
+        data["newCode"] = split_camel_case_and_clean(new_code_match.group(1).strip())
 
     if label_match := LABEL_REGEX.search(file_content):
         data["label"] = int(label_match.group(1))
 
     return data
+
+def parse_python_code_change(file_content):
+    """
+    Parses content from the specific Python code change format,
+    handling variable-length delimiters.
+    """
+    # Split by the first delimiter (line of hyphens)
+    parts_by_hyphens = PYTHON_OLD_NEW_DELIMITER_REGEX.split(file_content)
+
+    # We expect 2 parts: [content before ---, content after ---]
+    if len(parts_by_hyphens) < 2:
+        return None # First delimiter not found in the expected format
+
+    old_code_block_raw = parts_by_hyphens[0].strip()
+
+    # The second part contains the new code block and the final delimiter (line of equals)
+    new_code_and_rest = parts_by_hyphens[1]
+
+    # Split the remainder by the second delimiter (line of equals signs)
+    parts_by_equals = PYTHON_END_DELIMITER_REGEX.split(new_code_and_rest)
+
+    # We expect at least one part (the new code block itself)
+    if len(parts_by_equals) < 1:
+        return None # Second delimiter not found or not in expected format
+
+    new_code_block_raw = parts_by_equals[0].strip()
+
+    # If either code block is empty after stripping, it's likely a malformed file
+    if not old_code_block_raw or not new_code_block_raw:
+        return None
+
+    # Extract comments from raw code blocks and clean them
+    old_comments_list = extract_python_comments(old_code_block_raw)
+    new_comments_list = extract_python_comments(new_code_block_raw)
+
+    # Determine label based on comment change
+    label = 1 if old_comments_list != new_comments_list else 0
+
+    # Clean entire code blocks for similarity comparison
+    cleaned_old_code = split_camel_case_and_clean(old_code_block_raw)
+    cleaned_new_code = split_camel_case_and_clean(new_code_block_raw)
+
+    return {
+        "oldCode": cleaned_old_code,
+        "newCode": cleaned_new_code,
+        "oldComment": " ".join(old_comments_list), # Join cleaned comments into a single string
+        "newComment": " ".join(new_comments_list), # Join cleaned comments into a single string
+        "label": label,
+    }
 
 # Global variable to store the model, will be loaded once per process
 _model = None
@@ -73,7 +141,6 @@ def _initializer():
     global _model
     if _model is None:
         _model = SentenceTransformer("all-MiniLM-L6-v2")
-        #_model.similarity_fn_name = "euclidean"
 
 def compute_similarity_for_process(data):
     """
@@ -87,8 +154,6 @@ def compute_similarity_for_process(data):
         _initializer()
 
     texts_to_encode = []
-    # Use a flag to track if a particular text segment was added to `texts_to_encode`
-    # and store its original presence for accurate indexing.
     new_code_present = False
     old_comment_present = False
     old_code_present = False
@@ -112,10 +177,9 @@ def compute_similarity_for_process(data):
         similarity_matrix = _model.similarity(embeddings, embeddings)
 
         new_code_old_comment_sim = 0
+        old_code_new_code_sim = 0
         old_code_old_comment_sim = 0
 
-        # Dynamically find indices based on what was actually encoded
-        # This approach ensures correct indexing even if some fields are missing.
         encoded_text_map = {text: idx for idx, text in enumerate(texts_to_encode)}
 
         if new_code_present and old_comment_present:
@@ -125,12 +189,20 @@ def compute_similarity_for_process(data):
 
         if old_code_present and old_comment_present:
             old_code_idx = encoded_text_map[data["oldCode"]]
-            old_comment_idx = encoded_text_map[data["oldComment"]] # Re-use or get again
+            old_comment_idx = encoded_text_map[data["oldComment"]]
             old_code_old_comment_sim = similarity_matrix[old_code_idx, old_comment_idx].item()
+            new_code_old_comment_sim = similarity_matrix[new_code_idx, old_comment_idx].item()
+
+        if old_code_present and new_code_present:
+            old_code_idx = encoded_text_map[data["oldCode"]]
+            new_code_idx = encoded_text_map[data["newCode"]]
+            old_code_new_code_sim = similarity_matrix[old_code_idx, new_code_idx].item()
 
         return {
             "label": data["label"],
             "new_code_old_comment_similarity": new_code_old_comment_sim,
+            "old_code_new_code_similarity": old_code_new_code_sim,
+            "old_code_new_comment_similarity": new_code_old_comment_sim,
             "old_code_old_comment_similarity": old_code_old_comment_sim
         }
     except Exception as e:
@@ -138,20 +210,19 @@ def compute_similarity_for_process(data):
         return None
 
 
-def process_java_file(filepath):
+def process_file_for_similarity(filepath, parser_func):
     """
-    Reads a Java file, parses its content, and computes similarity scores.
-    Designed to be run in a multiprocessing pool.
-    Returns the raw similarity results to be aggregated in the main process.
+    Reads a file, parses its content using the provided parser_func,
+    and computes similarity scores.
     """
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             file_content = f.read()
-        data = parse_code_change_file(file_content)
+        data = parser_func(file_content)
         if data:
             return compute_similarity_for_process(data)
         else:
-            print(f"Warning: Could not parse content from {filepath}")
+            print(f"Warning: Could not parse content from {filepath} with {parser_func.__name__}")
             return None
     except Exception as e:
         print(f"Error processing {filepath}: {e}")
@@ -159,64 +230,69 @@ def process_java_file(filepath):
 
 def traverse_folder_for_similarity(root_path):
     """
-    Efficiently traverses a folder to find and process Java files for similarity.
-    Uses os.walk for traversal and multiprocessing for parallel processing.
-    Aggregates results after all files are processed, including the difference.
+    Efficiently traverses a folder to find and process Java and Python files for similarity.
+    Dispatches to the correct parsing function based on file content/extension.
     """
-    java_files = []
+    files_to_process = []
     for dirpath, _, filenames in os.walk(root_path):
         for f in filenames:
-            if f.endswith('.java') and "122" in f:
-                java_files.append(os.path.join(dirpath, f))
+            file_path = os.path.join(dirpath, f)
+            # Determine which parser to use based on file extension and potential content
+            if f.endswith('.py'):
+                # For Python files, assume the new Python format
+                files_to_process.append({'path': file_path, 'parser': parse_python_code_change})
+            elif f.endswith('.java') and '122' in f:
+                # For Java files, assume the existing Java format
+                files_to_process.append({'path': file_path, 'parser': parse_code_change_file})
+
 
     num_processes = max(1, cpu_count() - 1)
-    print(f"Processing {len(java_files)} Java files using {num_processes} processes...")
+    print(f"Processing {len(files_to_process)} files using {num_processes} processes...")
 
     all_results = []
-    if java_files:
+    if files_to_process:
         with Pool(processes=num_processes, initializer=_initializer) as pool:
-            all_results = pool.map(process_java_file, java_files)
+            # Prepare arguments for map: (filepath, parser_func)
+            # Use starmap to pass multiple arguments to `process_file_for_similarity`
+            tasks = [(info['path'], info['parser']) for info in files_to_process]
+            all_results = pool.starmap(process_file_for_similarity, tasks)
+
 
     numProcessed_0 = 0
     numProcessed_1 = 0
     total_new_code_old_comment_similarity_0 = 0
     total_new_code_old_comment_similarity_1 = 0
-    total_old_code_old_comment_similarity_0 = 0 # Track for label 0
-    total_old_code_old_comment_similarity_1 = 0 # Track for label 1
-    total_processed_files = 0 # This one is just for the overall average of old code to old comment
-
-    # --- New variables for difference calculation ---
+    total_old_code_old_comment_similarity_0 = 0
+    total_old_code_old_comment_similarity_1 = 0
+    total_old_code_new_code_similarity_0 = 0
+    total_old_code_new_code_similarity_1 = 0
     total_difference_label_0 = 0
     total_difference_label_1 = 0
-    # -----------------------------------------------
 
     for result in all_results:
         if result is not None:
-            # We will calculate total_processed_files and the overall avgOldCodeOldCommentSimilarity
-            # after iterating through all results for more accuracy.
-
-            # Accumulate totals for different labels
             if result["label"] == 0:
                 total_new_code_old_comment_similarity_0 += result["new_code_old_comment_similarity"]
                 total_old_code_old_comment_similarity_0 += result["old_code_old_comment_similarity"]
+                total_old_code_new_code_similarity_0 += result["old_code_new_code_similarity"]
                 numProcessed_0 += 1
                 total_difference_label_0 += (result["new_code_old_comment_similarity"] - result["old_code_old_comment_similarity"])
             elif result["label"] == 1:
                 total_new_code_old_comment_similarity_1 += result["new_code_old_comment_similarity"]
                 total_old_code_old_comment_similarity_1 += result["old_code_old_comment_similarity"]
+                total_old_code_new_code_similarity_1 += result["old_code_new_code_similarity"]
                 numProcessed_1 += 1
                 total_difference_label_1 += (result["new_code_old_comment_similarity"] - result["old_code_old_comment_similarity"])
 
     avgNewCodeOldCommentSimilarity_0 = (total_new_code_old_comment_similarity_0 / numProcessed_0) if numProcessed_0 > 0 else 0
     avgNewCodeOldCommentSimilarity_1 = (total_new_code_old_comment_similarity_1 / numProcessed_1) if numProcessed_1 > 0 else 0
 
-    # Calculate average old code to old comment similarity separately for each label
     avgOldCodeOldCommentSimilarity_0 = (total_old_code_old_comment_similarity_0 / numProcessed_0) if numProcessed_0 > 0 else 0
     avgOldCodeOldCommentSimilarity_1 = (total_old_code_old_comment_similarity_1 / numProcessed_1) if numProcessed_1 > 0 else 0
+    avgNewCodeOldCommentSimilarity_1 = (total_new_code_old_comment_similarity_1 / numProcessed_1) if numProcessed_1 > 0 else 0
 
-    # Calculate overall average for Old Code to Old Comment for combined context, if desired
-    # Or, you can just show per-label averages.
-    # For now, let's keep it per label for a clearer comparison of differences.
+    avgOldCodeNewCodeSimilarity_0 = (total_old_code_new_code_similarity_0 / numProcessed_0) if numProcessed_0 > 0 else 0
+    avgOldCodeNewCodeSimilarity_1 = (total_old_code_new_code_similarity_1 / numProcessed_1) if numProcessed_1 > 0 else 0
 
     avg_difference_label_0 = (total_difference_label_0 / numProcessed_0) if numProcessed_0 > 0 else 0
     avg_difference_label_1 = (total_difference_label_1 / numProcessed_1) if numProcessed_1 > 0 else 0
@@ -225,14 +301,15 @@ def traverse_folder_for_similarity(root_path):
     print(f"--- For Label 0 (e.g., negative; should be high) ---")
     print(f"  Avg New Code to Old Comment (Label 0): {avgNewCodeOldCommentSimilarity_0:.4f}")
     print(f"  Avg Old Code to Old Comment (Label 0): {avgOldCodeOldCommentSimilarity_0:.4f}")
+    print(f"  Avg Old Code to New Code (Label 0): {avgOldCodeNewCodeSimilarity_0:.4f}")
     print(f"  Avg Difference (New Code-Old Comment - Old Code-Old Comment) for Label 0: {avg_difference_label_0:.4f}")
 
     print(f"\n--- For Label 1 (e.g., positive; should be low) ---")
     print(f"  Avg New Code to Old Comment (Label 1): {avgNewCodeOldCommentSimilarity_1:.4f}")
     print(f"  Avg Old Code to Old Comment (Label 1): {avgOldCodeOldCommentSimilarity_1:.4f}")
+    print(f"  Avg Old Code to New Code (Label 1): {avgOldCodeNewCodeSimilarity_1:.4f}")
     print(f"  Avg Difference (New Code-Old Comment - Old Code-Old Comment) for Label 1: {avg_difference_label_1:.4f}")
 
 
-# Example Usage (for testing purposes, creates dummy files and then cleans up)
 if __name__ == "__main__":
-    traverse_folder_for_similarity("features")
+    traverse_folder_for_similarity("python_ccset_raw")
