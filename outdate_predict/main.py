@@ -20,8 +20,8 @@ import seaborn as sns
 
 import matplotlib.pyplot as plt
 
-block = pd.read_csv("../csv/block.csv")
-method = pd.read_csv("../csv/method.csv")
+block = pd.read_csv("/Users/graysonsiegler/Documents/Documents - Grayson’s MacBook Pro/RIT/REU/grayson-CoCC/csv/block.csv")
+method = pd.read_csv("/Users/graysonsiegler/Documents/Documents - Grayson’s MacBook Pro/RIT/REU/grayson-CoCC/csv/method.csv")
 #top = pd.read_csv('block_method_top.csv')
 #block_method = pd.concat([block, method], axis=0)
 # ------------------------ new version ------------------------

@@ -1,5 +1,5 @@
 import ch.uzh.ifi.seal.changedistiller.ast.FileUtils;
-import com.sun.corba.se.impl.resolver.SplitLocalResolverImpl;
+//import com.sun.corba.se.impl.resolver.SplitLocalResolverImpl;
 import org.eclipse.jdt.core.dom.*;
 
 
@@ -42,7 +42,6 @@ public class GetCCSet {
                 if (split[i].contains(">")) count++;
                 if (split[i].contains("<")) count++;
                 if (split[i].contains("[]")) return false;
-                ;
                 if (split[i].contains("=")) count++;
                 if (split[i].contains("()")) count++;
                 if (split[i].contains("for")) count++;
@@ -51,16 +50,12 @@ public class GetCCSet {
                 if (split[i].contains("String")) count++;
                 if (split[i].contains("try")) count++;
                 if (split[i].contains(");")) return false;
-                ;
                 if (split[i].contains("(") && split[i].contains(")")) count = count + 2;
                 if (split[i].contains("\"") && split[i].contains("=")) return false;
-                ;
                 if (split[i].contains("|")) count++;
                 if (split[i].contains("(") && (split[i].contains("if") || split[i].contains("for") || split[i].contains("while")))
                     return false;
-                ;
                 if (split[i].contains(">") && split[i].contains("<")) return false;
-                ;
                 if (split[i].contains("catch")) count++;
                 if (split[i].contains("Map")) count++;
                 if (split[i].contains("void")) count++;
@@ -68,7 +63,6 @@ public class GetCCSet {
                 if (split[i].contains("{")) count++;
                 if (split[i].contains("}")) count++;
                 if (split[i].contains("type info")) return false;
-                ;
                 if (split[i].contains("@author")) count++;
                 if (split[i].contains("@version")) count++;
                 if (split[i].contains(".set")) {
@@ -98,10 +92,7 @@ public class GetCCSet {
                 }
             }
         }
-        if (count >= 3) return false;
-
-
-        return true;
+        return count < 3;
     }
 
     public static boolean isValidCode(String code) {
@@ -137,7 +128,7 @@ public class GetCCSet {
                 if (s.contains("/*")) count++;
                 if (s.contains("*/")) count++;
             }
-            if (count >= 2) return false;
+            return count < 2;
 
         }
         return true;
@@ -153,7 +144,7 @@ public class GetCCSet {
             }
         }
         return lineNum;
-//        return 200;
+    //        return 200;
     }
 
     public static List cmtAndCode(String filepath) throws IOException {
@@ -218,13 +209,13 @@ public class GetCCSet {
                         } else {
                             if (strtemp.equals("")) {
                                 oldComment = new StringBuffer(strtemp + sourcecode.substring(startpos, endpos));
-                                strtemp = new StringBuffer("");
+                                strtemp = new StringBuffer();
                             } else oldComment = new StringBuffer(sourcecode.substring(startpos, endpos));
                         }
                     } else {
                         if (strtemp.equals("")) {
                             oldComment = new StringBuffer(strtemp + sourcecode.substring(startpos, endpos));
-                            strtemp = new StringBuffer("");
+                            strtemp = new StringBuffer();
                         } else oldComment = new StringBuffer(sourcecode.substring(startpos, endpos));
 
                     }
@@ -453,7 +444,7 @@ public class GetCCSet {
 
     public static float getSimilarityRatio(String str, String target) {
 
-        int d[][]; // 矩阵
+        int[][] d; // 矩阵
         int n = str.length();
         int m = target.length();
         int i; // 遍历str的
@@ -503,12 +494,8 @@ public class GetCCSet {
     public static void getCCSetJavaFile(String filepath) throws IOException {
         List ccSet1 = null;
         List ccSet2 = null;
-        try {
-            ccSet1 = getCCSet(filepath);
-            ccSet2 = getCCSet(filepath.replace("/old/", "/new/"));
-        } catch (Exception e) {
-            return;
-        }
+        ccSet1 = getCCSet(filepath);
+        ccSet2 = getCCSet(filepath.replace("/old/", "/new/").replace("Old.java","New.java"));
 
         String oldComment = null;
         String oldCode = null;
@@ -546,7 +533,7 @@ public class GetCCSet {
 //                        }
 //                        fileWriter = new FileWriter("/Users/chenyn/chenyn's/研究生/DataSet/My/CCSet/" + split[split.length - 4] + "/" + num1 + num2 + num3 + split[split.length - 1].replace("/", ""));
 //                    }
-                    fileWriter = new FileWriter("/Users/chenyn/chenyn's/研究生/DataSet/My dect/RQ4/opennms_ccset/" + num1 + num2 + num3 + split[split.length - 1].replace("/", ""));
+                    fileWriter = new FileWriter("panthaplackel/cc-set" + num1 + num2 + num3 + split[split.length - 1].replace("/", ""));
                     fileWriter.write("==========================================CCSet==========================================\n");
                     fileWriter.write("oldComment:\n" + oldComment + "\n");
                     fileWriter.write("oldCode:\n" + oldCode + "\n");
@@ -586,7 +573,7 @@ public class GetCCSet {
 //            filesDirs(new File("/Users/chenyn/chenyn's/研究生/DataSet/CommitData/论文/" + projects[i]));
 //        }
 
-        filesDirs(new File("/Users/chenyn/chenyn's/研究生/DataSet/My dect/RQ4/opennms_ccset"));
+        filesDirs(new File("panthaplackel"));
 
     }
 

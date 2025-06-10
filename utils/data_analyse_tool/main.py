@@ -48,7 +48,7 @@ def traverse_folder_for_Q13(path):
             else:
                 unchanged_cnt += 1
 
-traverse_folder_for_Q13("/Users/chenyn/chenyn's/研究生/DataSet/My dect/data/回复/")
+traverse_folder_for_Q13("features")
 print(method_cnt)
 
 # print(change_number)
